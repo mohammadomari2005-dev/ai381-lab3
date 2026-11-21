@@ -51,9 +51,13 @@ def preprocessing() -> ColumnTransformer:
 # TODO 1: choose at least three candidates and justify them in MODEL_SELECTION.md.
 # Change the settings, not just the names: a different model family or a clearly different setting each time.
 CANDIDATES = {
-    "logreg": LogisticRegression(max_iter=1000),
-    "random_forest": RandomForestClassifier(n_estimators=200, max_depth=8, random_state=42),
-    "gradient_boosting": GradientBoostingClassifier(random_state=42),
+    "logreg_balanced": LogisticRegression(C=0.5, class_weight="balanced", max_iter=1000),
+    "random_forest": RandomForestClassifier(
+        n_estimators=100, max_depth=6, min_samples_leaf=5, class_weight="balanced", random_state=42
+    ),
+    "gradient_boosting": GradientBoostingClassifier(
+        n_estimators=150, learning_rate=0.05, max_depth=3, random_state=42
+    ),
 }
 
 
@@ -111,7 +115,15 @@ def main() -> None:
 
             # the model, with its signature (inputs and outputs) and an example row
             signature = infer_signature(X_te, proba)
-            info = mlflow.sklearn.log_model(model, name="model", signature=signature, input_example=X_te.head(3))
+            # skops (MLflow's safe model format) refuses tree models unless we name the type we trust.
+            # We trained this model ourselves a moment ago, so trusting sklearn's Tree class is safe here.
+            info = mlflow.sklearn.log_model(
+                model,
+                name="model",
+                signature=signature,
+                input_example=X_te.head(3),
+                skops_trusted_types=["sklearn.tree._tree.Tree"],
+            )
             mlflow.set_tag("model_uri", info.model_uri)
 
             print(f"{name:18s} run {run.info.run_id[:8]}  auc {metrics['auc']:.3f}  f1 {metrics['f1']:.3f}  "
